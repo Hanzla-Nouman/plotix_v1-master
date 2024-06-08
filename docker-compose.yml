@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${PG_DATABASE} 
+      POSTGRES_USER: ${PG_USERNAME}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  s3:
+    image: scireum/s3-ninja
+    ports:
+      - "9000:9000"
+    volumes:
+      - s3-data-storage:/data
+
+volumes:
+  postgres_data:
+  s3-data-storage:

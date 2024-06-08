@@ -1,0 +1,386 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator zod {
+  provider                         = "zod-prisma-types"
+  validateWhereUniqueInput         = false
+  createRelationValuesTypes        = true
+  writeNullishInModelTypes         = true
+  useTypeAssertions                = true
+  createOptionalDefaultValuesTypes = false
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+model Media {
+  id          String    @id @default(uuid())
+  createdById String?
+  updatedAt   DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  url         String
+  filename    String
+  thumbnailId String?   @unique
+  type        MediaType
+  mimeType    String
+
+  coachAsIntroVideo        Coach? @relation("IntroVideo")
+  coachAsBackgroundPicture Coach? @relation("BackgroundPicture")
+
+  coachingPackageAsImage          CoachingPackage[] @relation("Image")
+  coachingPackageAsExplainerVideo CoachingPackage[] @relation("ExplainerVideo")
+
+  thumbnail   Media? @relation("Thumbnail", fields: [thumbnailId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  thumbnailOf Media? @relation("Thumbnail")
+
+  portfolioItem  PortfolioItem[]  @relation("PortfolioImage")
+  workExperience WorkExperience[] @relation("WorkExperienceImage")
+  user           User?            @relation("Avatar")
+
+  createdBy User? @relation("Gallery", fields: [createdById], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model User {
+  id                      String    @id @default(uuid())
+  stripeCustomerId        String?
+  role                    Role      @default(user)
+  updatedAt               DateTime  @default(now())
+  createdAt               DateTime  @default(now())
+  email                   String    @unique
+  name                    String?
+  resetPasswordToken      String?   @db.VarChar
+  avatarId                String?   @unique
+  resetPasswordExpiration String?   @db.VarChar
+  hash                    String
+  loginAttempts           Int?
+  lockUntil               DateTime? @db.Date
+  emailVerified           Boolean   @default(false)
+  timezone                String?
+  preferedLanguages       LanguageOptions[]
+  preferedCurrency        String?   @default("USD")
+  preferedCoachCategories CoachCategory[]
+
+  focusAreas       FocusArea[]
+  purchases        Purchase[]
+  bookings         Booking[]
+  subscribedTo     Coach[]    @relation("Subsriber")
+  accounts         Account[]
+  sessions         Session[]
+  gallery          Media[]    @relation("Gallery")
+  messagesSent     Message[]  @relation("Sender")
+  messagesReceived Message[]  @relation("Receiver")
+  coach            Coach?
+  avatar           Media?     @relation("Avatar", fields: [avatarId], references: [id], onDelete: Cascade)
+}
+
+model CoachCategory {
+  id      String  @id @default(uuid())
+  name    String  @unique
+  order   Int
+
+  coaches Coach[]
+  users   User[]
+}
+
+model Coach {
+  id                     String                      @id @default(uuid())
+  stripeAccountId        String?                     @unique
+  stripeDetailsSubmitted Boolean                     @default(false)
+  name                   String
+  headline               String?
+  aboutMe                String?
+  whyICoach              String?
+  hourlyRate             Int
+  userId                 String                      @unique
+  language               LanguageOptions[]
+  freeIntroductionOption FreeSessionDurationOptions?
+  approvedForSale        ApprovalStatus?
+  priceId                String?
+  stripeId               String?
+  introVideoId           String?                     @unique
+  backgroundPictureId    String?                     @unique
+  updatedAt              DateTime                    @default(now())
+  createdAt              DateTime                    @default(now())
+  location               String?
+  linkedinUrl            String?
+  youtubeUrl             String?
+  facebookUrl            String?
+  twitterUrl             String?
+  instagramUrl           String?
+  twitchUrl              String?
+  tiktokUrl              String?
+
+  sales             Purchase[]
+  bookings          Booking[]
+  subscribers       User[]            @relation("Subsriber")
+  categories        CoachCategory[]
+  coachFAQs         CoachFAQ[]
+  coachingPackages  CoachingPackage[]
+  portfolioItems    PortfolioItem[]
+  focusAreas        FocusArea[]
+  workHistory       WorkExperience[]
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  introVideo        Media?            @relation("IntroVideo", fields: [introVideoId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  backgroundPicture Media?            @relation("BackgroundPicture", fields: [backgroundPictureId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Booking {
+  id                String   @id @default(uuid())
+  coachId           String
+  userId            String
+  coachingPackageId String?
+  purchaseId        String?
+  eventSlug         String
+  endDate           DateTime
+  startDate         DateTime
+  createdAt         DateTime @default(now())
+  isCanceled        Boolean
+  isCompleted       Boolean  @default(false)
+  roomId            String
+  bookingUid        String   @unique
+  bookingId         String   @unique
+  calcomUsername    String
+
+  purchase        Purchase?        @relation(fields: [purchaseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  coachingPackage CoachingPackage? @relation(fields: [coachingPackageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  coach           Coach            @relation(fields: [coachId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Purchase {
+  id                 String        @id @default(uuid())
+  coachId            String
+  createdAt          DateTime      @default(now())
+  hasPendingBookings Boolean       @default(true)
+  price              Int
+  eventSlug          String
+  currency           String
+  userId             String
+  coachingPackageId  String?
+  isCanceled         Boolean       @default(false)
+  checkoutSessionId  String        @unique
+  paymentStatus      PaymentStatus @default(notStarted)
+
+  bookings        Booking[]
+  coachingPackage CoachingPackage? @relation(fields: [coachingPackageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  coach           Coach            @relation(fields: [coachId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model CoachingPackage {
+  id               String  @id @default(uuid())
+  coachId          String
+  categoryId       String
+  title            String
+  order            Int
+  imageId          String
+  explainerVideoId String?
+  description      String
+  price            Int
+  time             Int
+  numberOfSessions Int
+  seats            Int?
+  eventTypeId      Int?
+
+  relatedPurchases Purchase[]
+  bookings         Booking[]
+  focusAreas       FocusArea[]
+  coach            Coach                   @relation(fields: [coachId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  category         CoachingPackageCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  image            Media                   @relation("Image", fields: [imageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  explainerVideo   Media?                  @relation("ExplainerVideo", fields: [explainerVideoId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([coachId, title, categoryId])
+}
+
+model FocusArea {
+  id   String @id @default(uuid())
+  name String @unique
+
+  coachingPackages CoachingPackage[]
+  coaches          Coach[]
+  users            User[]
+}
+
+model CoachingPackageCategory {
+  id               String            @id @default(uuid())
+  name             String            @unique
+  coachingPackages CoachingPackage[]
+}
+
+model PortfolioItem {
+  id          String  @id @default(uuid())
+  name        String
+  order       Int
+  coachId     String
+  imgId       String?
+  description String?
+
+  coach Coach  @relation(fields: [coachId], references: [id])
+  img   Media? @relation("PortfolioImage", fields: [imgId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  createdAt  DateTime @default(now())
+  isRead     Boolean
+
+  sender   User @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  receiver User @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  token     String   @unique
+  expiresAt DateTime
+}
+
+model WorkExperience {
+  id          String    @id @default(uuid())
+  jobTitle    String
+  companyName String
+  isCurrent   Boolean   @default(false)
+  coachId     String
+  imageId     String?
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+
+  coach Coach  @relation(fields: [coachId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  image Media? @relation("WorkExperienceImage", fields: [imageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model CoachFAQ {
+  id       String @id @default(uuid())
+  question String
+  answer   String
+  order    Int
+  coachId  String
+
+  coach Coach @relation(fields: [coachId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+enum PaymentStatus {
+  notStarted
+  pending
+  success
+  failed
+}
+
+enum LanguageOptions {
+  English
+  Spanish
+  French
+  German
+  Chinese
+  Japanese
+  Korean
+  Arabic
+  Russian
+  Italian
+  Portuguese
+  Dutch
+  Swedish
+  Turkish
+  Hindi
+  Bengali
+  Urdu
+  Persian
+  Punjabi
+  Swahili
+  Vietnamese
+  Indonesian
+  Malay
+  Thai
+  Greek
+  Hebrew
+  Czech
+  Polish
+  Romanian
+  Hungarian
+  Finnish
+  Danish
+  Norwegian
+  Icelandic
+  Slovak
+  Slovenian
+  Croatian
+  Bulgarian
+  Serbian
+  Macedonian
+  Albanian
+  Latvian
+  Lithuanian
+  Estonian
+  Georgian
+  Armenian
+  Azerbaijani
+  Kazakh
+  Uzbek
+  Yoruba
+}
+
+enum PinnedOptions {
+  Achievement
+  Publication
+  Contribution
+  Milestone
+  MediaFeature
+}
+
+enum FreeSessionDurationOptions {
+  FifteenMinutes
+  ThirtyMinutes
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  denied
+}
+
+enum Role {
+  admin
+  user
+  coach
+}
+
+enum MediaType {
+  image
+  video
+  file
+}
